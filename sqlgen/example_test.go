@@ -14,7 +14,8 @@ func TestMVIndex(t *testing.T) {
 
 	// at least have one JSON column
 	state.ReplaceRule(sqlgen.ColumnDefinitions, sqlgen.ColumnDefinitionsWithJSON)
-	createTables := generateCreateTable(state, 1, 5, 1)
+	state.ReplaceRule(sqlgen.IndexDefinitions, sqlgen.MVIndexDefinition)
+	createTables := generateCreateTable(state, 1, 3, 1)
 	for _, sql := range createTables {
 		fmt.Println(sql)
 	}

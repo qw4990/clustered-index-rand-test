@@ -7,7 +7,26 @@ import (
 	"github.com/cznic/mathutil"
 )
 
-var MVIndexDefinitionColumns = NewFn(nil)
+var MVIndexDefinitionColumns = NewFn(func(state *State) Fn {
+	tbl := state.env.Table
+	idx := state.env.Index
+
+	jsonCols := tbl.Columns.Filter(func(c *Column) bool {
+		return !idx.HasColumn(c) && c.Tp == ColumnTypeJSON
+	})
+	nonJSONCols := tbl.Columns.Filter(func(c *Column) bool {
+		return !idx.HasColumn(c) && c.Tp != ColumnTypeJSON
+	})
+	if len(jsonCols) == 0 {
+		return Empty
+	}
+	if len(nonJSONCols) == 0 {
+		//cs := nonJSONCols.RandN()
+	}
+	cj := jsonCols.Rand()
+	idx.Columns = jsonCols
+	return Str(fmt.Sprintf("(cast %s as signed array)", cj.Name))
+})
 
 // MVIndexDefinition is the definition of Multi-Valued Index.
 var MVIndexDefinition = NewFn(func(state *State) Fn {
@@ -15,12 +34,12 @@ var MVIndexDefinition = NewFn(func(state *State) Fn {
 	newIdx := &Index{ID: state.alloc.AllocIndexID()}
 	state.env.Index = newIdx
 	// Example:
-	//   unique key idx_1 (a, b, c)
-	//   primary key (a(2), b(3), c)
+	//   idx_1 (a, b, cast(j as char(10) array))
+	//   idx_2 (cast(j->'$.path' as sign array))
 	ret, err := And(
 		IndexDefinitionTypeNonUnique,
 		IndexDefinitionName,
-		IndexDefinitionColumns,
+		MVIndexDefinitionColumns,
 	).Eval(state)
 	if err != nil {
 		return NoneBecauseOf(err)
