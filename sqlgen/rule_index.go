@@ -7,6 +7,35 @@ import (
 	"github.com/cznic/mathutil"
 )
 
+var MVIndexDefinitionColumns = NewFn(nil)
+
+// MVIndexDefinition is the definition of Multi-Valued Index.
+var MVIndexDefinition = NewFn(func(state *State) Fn {
+	tbl := state.env.Table
+	newIdx := &Index{ID: state.alloc.AllocIndexID()}
+	state.env.Index = newIdx
+	// Example:
+	//   unique key idx_1 (a, b, c)
+	//   primary key (a(2), b(3), c)
+	ret, err := And(
+		IndexDefinitionTypeNonUnique,
+		IndexDefinitionName,
+		IndexDefinitionColumns,
+	).Eval(state)
+	if err != nil {
+		return NoneBecauseOf(err)
+	}
+	// It is possible that no column can be used to build an index.
+	if len(newIdx.Columns) == 0 {
+		return Empty
+	}
+	tbl.AppendIndex(newIdx)
+	if state.env.MultiObjs != nil {
+		state.env.MultiObjs.AddName(newIdx.Name)
+	}
+	return Str(ret)
+})
+
 var IndexDefinitions = NewFn(func(state *State) Fn {
 	return Repeat(IndexDefinition.R(0, 4), Str(","))
 })
