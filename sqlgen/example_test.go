@@ -13,11 +13,23 @@ func TestMVIndex(t *testing.T) {
 	state := sqlgen.NewState()
 
 	// at least have one JSON column
+	//state.SetWeight(sqlgen.PartitionDefinition, 0)
+	state.SetWeight(sqlgen.TableOptions, 0)
 	state.ReplaceRule(sqlgen.ColumnDefinitions, sqlgen.ColumnDefinitionsWithJSON)
 	state.ReplaceRule(sqlgen.IndexDefinitions, sqlgen.MVIndexDefinition)
 	createTables := generateCreateTable(state, 1, 3, 1)
 	for _, sql := range createTables {
-		fmt.Println(sql)
+		fmt.Println(sql + ";")
+	}
+
+	insertSQLs := generateInsertInto(state, 2)
+	for _, sql := range insertSQLs {
+		fmt.Println(sql + ";")
+	}
+
+	queries := generateQuery(state, 20)
+	for _, sql := range queries {
+		fmt.Println(sql + ";")
 	}
 }
 

@@ -64,6 +64,7 @@ type Index struct {
 	Tp           IndexType
 	Columns      Columns
 	ColumnPrefix []int
+	IsMVIndex    bool
 }
 
 type Prepare struct {

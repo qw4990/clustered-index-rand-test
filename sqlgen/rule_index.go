@@ -3,6 +3,7 @@ package sqlgen
 import (
 	"fmt"
 	"math/rand"
+	"strings"
 
 	"github.com/cznic/mathutil"
 )
@@ -20,12 +21,25 @@ var MVIndexDefinitionColumns = NewFn(func(state *State) Fn {
 	if len(jsonCols) == 0 {
 		return Empty
 	}
-	if len(nonJSONCols) == 0 {
-		//cs := nonJSONCols.RandN()
+
+	cols := nonJSONCols.RandN()
+	if len(cols) == 0 {
+		cols = append(cols, jsonCols.Rand())
+	} else {
+		cols[rand.Intn(len(cols))] = jsonCols.Rand()
 	}
-	cj := jsonCols.Rand()
-	idx.Columns = jsonCols
-	return Str(fmt.Sprintf("(cast %s as signed array)", cj.Name))
+	idx.Columns = cols
+	idx.IsMVIndex = true
+
+	var colStrs []string
+	for _, c := range cols {
+		if c.Tp == ColumnTypeJSON {
+			colStrs = append(colStrs, fmt.Sprintf("(cast(%s as signed array))", c.Name))
+		} else {
+			colStrs = append(colStrs, c.Name)
+		}
+	}
+	return Str("(" + strings.Join(colStrs, ", ") + ")")
 })
 
 // MVIndexDefinition is the definition of Multi-Valued Index.

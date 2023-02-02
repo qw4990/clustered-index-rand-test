@@ -639,7 +639,7 @@ var ColumnPositionAfter = NewFn(func(state *State) Fn {
 var AndOr = NewFn(func(state *State) Fn {
 	return Or(
 		Str("and"),
-		Str("or"),
+		//Str("or"),
 	)
 })
 

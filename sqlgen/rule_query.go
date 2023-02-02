@@ -11,8 +11,8 @@ import (
 var Query = NewFn(func(state *State) Fn {
 	return Or(
 		SingleSelect,
-		MultiSelect,
-		UnionSelect,
+		//MultiSelect,
+		//UnionSelect,
 	)
 }).P(HasTables)
 
@@ -93,7 +93,7 @@ var MultiSelect = NewFn(func(state *State) Fn {
 var CommonSelect = NewFn(func(state *State) Fn {
 	NotNil(state.env.QState)
 	return And(
-		Str("select"), HintTiFlash, Opt(HintIndexMerge), Opt(HintAggToCop), HintJoin,
+		Str("select"), HintIndexMerge, HintJoin,
 		SelectFields, Str("from"), TableReference,
 		WhereClause, GroupByColumnsOpt, WindowClause, Opt(OrderByLimit), ForUpdateOpt,
 	)
@@ -123,10 +123,10 @@ var SelectField = NewFn(func(state *State) Fn {
 	NotNil(state.env.Table)
 	NotNil(state.env.QColumns)
 	return Or(
-		AggFunction,
-		BuiltinFunction,
+		//AggFunction,
+		//BuiltinFunction,
 		SelectFieldName,
-		WindowFunctionOverW,
+		//WindowFunctionOverW,
 	)
 })
 
@@ -198,10 +198,7 @@ var GroupByColumnsOpt = NewFn(func(state *State) Fn {
 })
 
 var WhereClause = NewFn(func(state *State) Fn {
-	return Or(
-		Empty,
-		And(Str("where"), Predicates).W(3),
-	)
+	return And(Str("where"), Predicates).W(3)
 })
 
 var HintJoin = NewFn(func(state *State) Fn {
@@ -320,6 +317,13 @@ var Predicates = NewFn(func(state *State) Fn {
 		}
 		pred = append(pred, p)
 	}
+
+	p, err := MVJSONPredicate.Eval(state)
+	if err != nil {
+		return NoneBecauseOf(err)
+	}
+	pred = append(pred, "and", p)
+
 	return Str(strings.Join(pred, " "))
 })
 
@@ -329,16 +333,70 @@ func init() {
 	Predicates2 = Predicates
 }
 
+var MVJSONPredicate = NewFn(func(state *State) Fn {
+	tbl := state.env.Table
+	var mvIndex *Index
+	for _, idx := range tbl.Indexes {
+		if idx.IsMVIndex {
+			mvIndex = idx
+			break
+		}
+	}
+
+	var preds []Fn
+	for i, col := range mvIndex.Columns {
+		if i > 0 {
+			preds = append(preds, Str("and"))
+		}
+
+		colName := fmt.Sprintf("%s.%s", tbl.Name, col.Name)
+		if col.Tp == ColumnTypeJSON {
+			switch rand.Intn(3) {
+			case 0: // json overlaps
+				preds = append(preds, Str(fmt.Sprintf("json_overlaps((%v), %v)", colName, randJSONArray())))
+			case 1: // json contains
+				preds = append(preds, Str(fmt.Sprintf("json_contains((%v), %v)", colName, randJSONArray())))
+			default: // member of
+				preds = append(preds, Str(fmt.Sprintf("(%v member of (%s))", rand.Intn(10), colName)))
+			}
+		} else {
+			state.env.Column = col
+			preds = append(preds, EQPredicate)
+		}
+	}
+
+	return And(preds...)
+})
+
+func randJSONArray() string {
+	n := rand.Intn(10)
+	var vals []string
+	for i := 0; i < n; i++ {
+		vals = append(vals, fmt.Sprintf("%v", rand.Intn(10)))
+	}
+	return fmt.Sprintf("'[%v]'", strings.Join(vals, ", "))
+}
+
+var EQPredicate = NewFn(func(state *State) Fn {
+	tbl := state.env.Table
+	randCol := state.env.Column
+	colName := fmt.Sprintf("%s.%s", tbl.Name, randCol.Name)
+	return And(Str(colName), Str("="), RandVal)
+})
+
 var Predicate = NewFn(func(state *State) Fn {
 	tbl := state.env.Table
 	randCol := state.env.Column
 	colName := fmt.Sprintf("%s.%s", tbl.Name, randCol.Name)
-	pre := Or(
+
+	var pre Fn
+	pre = Or(
 		And(Str(colName), CompareSymbol, RandVal),
 		And(Str(colName), Str("in"), Str("("), InValues, Str(")")),
 		And(Str("IsNull("), Str(colName), Str(")")),
 		And(Str(colName), Str("between"), RandVal, Str("and"), RandVal),
 	)
+
 	return Or(
 		pre,
 		And(Str("not("), pre, Str(")")),

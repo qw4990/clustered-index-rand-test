@@ -304,6 +304,7 @@ func RandJsons(count int) []string {
 	res := make([]string, 0, count)
 	for i := 0; i < count; i++ {
 		jsonType := JSONType(rand.Intn(len(jMap)))
+		jsonType = JSONTypeCodeArray
 		length := len(jMap[jsonType])
 		res = append(res, jMap[jsonType][rand.Intn(length)])
 	}
