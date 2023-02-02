@@ -8,6 +8,35 @@ import (
 	"github.com/cznic/mathutil"
 )
 
+var ColumnJSONDefinition = NewFn(func(state *State) Fn {
+	tbl := state.env.Table
+	partialCol := &Column{ID: state.alloc.AllocColumnID()}
+	state.env.Column = partialCol
+	// Example:
+	//   a varchar(255) collate utf8mb4_bin not null
+	//   b bigint unsigned default 100
+	ret, err := And(
+		ColumnDefinitionName,
+		ColumnDefinitionTypesJSON,
+		ColumnDefinitionCollation,
+		ColumnDefinitionUnsigned,
+		ColumnDefinitionNotNull,
+		ColumnDefinitionDefault,
+	).Eval(state)
+	if err != nil {
+		return NoneBecauseOf(err)
+	}
+	tbl.AppendColumn(partialCol)
+	return Str(ret)
+})
+
+var ColumnDefinitionsWithJSON = NewFn(func(state *State) Fn {
+	return And(
+		Repeat(ColumnDefinition.R(1, 10), Str(",")),
+		Str(","),
+		ColumnJSONDefinition)
+})
+
 var ColumnDefinitions = NewFn(func(state *State) Fn {
 	return Repeat(ColumnDefinition.R(1, 10), Str(","))
 })

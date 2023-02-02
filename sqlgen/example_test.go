@@ -9,6 +9,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestMVIndex(t *testing.T) {
+	state := sqlgen.NewState()
+
+	// at least have one JSON column
+	state.ReplaceRule(sqlgen.ColumnDefinitions, sqlgen.ColumnDefinitionsWithJSON)
+	createTables := generateCreateTable(state, 1, 5, 1)
+	for _, sql := range createTables {
+		fmt.Println(sql)
+	}
+}
+
 func TestReadMeExample(t *testing.T) {
 	state := sqlgen.NewState()
 	state.Config().SetMaxTable(200)
